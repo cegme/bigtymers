@@ -1,0 +1,22 @@
+[build-system]
+requires = ["setuptools>=61"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "bigtymers"
+version = "0.1.0"
+description = "Minimal full screen analog and digital clock and countdown timer for the terminal"
+readme = "README.md"
+license = { file = "LICENSE" }
+requires-python = ">=3.9"
+authors = [{ name = "Christan Grant" }]
+
+[project.urls]
+Homepage = "https://ceg.me/bigtymers"
+Source = "https://github.com/cegme/bigtymers"
+
+[project.scripts]
+btyme = "bigtymers:main"
+
+[tool.setuptools]
+py-modules = ["bigtymers"]

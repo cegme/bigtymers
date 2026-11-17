@@ -14,6 +14,29 @@ curl -fsSL https://ceg.me/bigtymers/bigtymers.py | python3 - 45m
 The terminal version needs only Python 3.9 or newer and no packages.
 Keys are read from the terminal device, so piping the script into Python works.
 
+## Install the btyme command
+
+On Linux or macOS with Python 3.9 or newer, this installs `btyme` into `~/.local/bin`:
+
+```
+curl -fsSL https://ceg.me/bigtymers/install.sh | sh
+btyme 45m
+```
+
+If `~/.local/bin` is not on your PATH, the installer prints the line to add.
+Set `BTYME_DIR` to install somewhere else.
+Remove it with `curl -fsSL https://ceg.me/bigtymers/install.sh | sh -s -- --uninstall`.
+
+With pipx or uv instead:
+
+```
+pipx install git+https://github.com/cegme/bigtymers
+uv tool install git+https://github.com/cegme/bigtymers
+uvx --from git+https://github.com/cegme/bigtymers btyme 45m
+```
+
+The last line runs it once without installing.
+
 ## Display
 
 Both versions show an analog face, a digital face, or both.
@@ -72,7 +95,7 @@ Press any key when the page opens to arm the alarm sound.
 ## Terminal
 
 ```
-bigtymers.py [duration] [--view clock|timer] [--face both|analog|digital]
+btyme [duration] [--view clock|timer] [--face both|analog|digital]
              [--tz ZONE[,ZONE...]] [--12] [--no-seconds] [--details]
              [--sound NAME_OR_FILE] [--no-bell] [--paused]
 ```
@@ -80,9 +103,9 @@ bigtymers.py [duration] [--view clock|timer] [--face both|analog|digital]
 Examples:
 
 ```
-curl -fsSL https://ceg.me/bigtymers/bigtymers.py | python3 - 90m --face analog
-curl -fsSL https://ceg.me/bigtymers/bigtymers.py | python3 - --tz local,Asia/Tokyo --12
-curl -fsSL https://ceg.me/bigtymers/bigtymers.py | python3 - 1h30m --sound Glass
+btyme 90m --face analog
+btyme --tz local,Asia/Tokyo --12
+btyme 1h30m --sound Glass
 ```
 
 Giving a duration starts the timer.
@@ -108,6 +131,12 @@ The alarm flashes the screen and rings the terminal bell.
 `--sound` plays a file instead.
 On macOS use a system sound name such as Glass, Submarine or Hero, or a path to an audio file.
 Playback uses `afplay`, `paplay` or `aplay`, whichever is installed.
+
+## License and credit
+
+BigTymers is free to use and modify under the MIT License.
+If you use it in a course, an exam or an organization, I would love to hear about it.
+Open an issue at https://github.com/cegme/bigtymers/issues to let me know.
 
 ## Hosting
 

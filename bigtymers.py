@@ -584,9 +584,9 @@ def main(argv=None):
         The process exit code.
     """
     parser = argparse.ArgumentParser(
-        prog="bigtymers",
+        prog="btyme",
         description="Full screen analog and digital clock and timer.",
-        epilog="Examples: bigtymers 45m | bigtymers 1h30m --face analog | bigtymers",
+        epilog="Examples: btyme 45m | btyme 1h30m --face analog | btyme",
     )
     parser.add_argument(
         "duration",
