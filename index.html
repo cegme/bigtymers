@@ -1,0 +1,635 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>BigTymers</title>
+<meta name="description" content="Minimal full screen analog and digital clock and countdown timer for exams and presentations.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ccircle cx='50' cy='50' r='44' fill='none' stroke='%2335d07f' stroke-width='8'/%3E%3Cpath d='M50 50V22M50 50l18 10' stroke='%2335d07f' stroke-width='8' stroke-linecap='round'/%3E%3C/svg%3E">
+<style>
+:root {
+  --bg: #0b0d10; --fg: #f2f5f7; --dim: #7d8894; --accent: #35d07f;
+  --warn: #f5b84a; --danger: #ff5252; --panel: #151a20; --line: #2a313a;
+  --on-accent: #04170d;
+}
+:root[data-theme="light"] {
+  --bg: #fafafa; --fg: #14181c; --dim: #6a7580; --accent: #0f8a55;
+  --warn: #a96a00; --danger: #cf2222; --panel: #ffffff; --line: #d3d9df;
+  --on-accent: #ffffff;
+}
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  background: var(--bg); color: var(--fg);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --lvl: var(--fg); overflow: hidden;
+}
+body[data-view="timer"] { --lvl: var(--accent); }
+body[data-view="timer"][data-level="warn"] { --lvl: var(--warn); }
+body[data-view="timer"][data-level="danger"] { --lvl: var(--danger); }
+
+@keyframes flash {
+  0%, 49.99% { background: #e01b1b; color: #fff; }
+  50%, 100% { background: #fff; color: #111; }
+}
+body.alarm { animation: flash 1s steps(1) infinite; --fg: currentColor; --dim: currentColor; --lvl: currentColor; --line: currentColor; --danger: currentColor; }
+
+/* main display */
+#stage {
+  position: fixed; inset: 0; display: grid; gap: 3vmin; padding: 4vmin;
+  grid-template-columns: minmax(0, 1fr);
+  grid-template-rows: minmax(0, 3fr) minmax(0, 2fr);
+}
+body[data-face="analog"] #stage, body[data-face="digital"] #stage { grid-template-rows: minmax(0, 1fr); }
+body[data-face="analog"] #digital, body[data-face="digital"] #analog { display: none; }
+@media (min-aspect-ratio: 3/2) {
+  body[data-face="both"] #stage { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); grid-template-rows: minmax(0, 1fr); }
+}
+#analog, #digital { min-width: 0; min-height: 0; }
+#face { width: 100%; height: 100%; display: block; }
+#face .rim { fill: none; stroke: var(--line); stroke-width: 1.2; }
+#face .track { fill: none; stroke: var(--line); stroke-width: 4; opacity: .6; }
+#face .ring { fill: none; stroke: var(--lvl); stroke-width: 4; }
+#face .tick { stroke: var(--dim); stroke-width: 1; }
+#face .tick.major { stroke: var(--fg); stroke-width: 2.5; }
+#face .num { fill: var(--fg); font-size: 11px; font-weight: 600; text-anchor: middle; dominant-baseline: central; font-family: inherit; }
+#face .hand { stroke: var(--fg); stroke-linecap: round; }
+#face .sec { stroke: var(--danger); }
+#face .hub { fill: var(--danger); }
+body[data-view="clock"] .ring, body[data-view="clock"] .track { display: none; }
+body[data-view="timer"] .tick { display: none; }
+body[data-view="timer"] #hour { display: none; }
+body[data-numerals="off"] .num { display: none; }
+body[data-view="clock"][data-seconds="off"] #second, body[data-view="clock"][data-seconds="off"] .hub { display: none; }
+
+#digital { display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; }
+#label { text-transform: uppercase; letter-spacing: .25em; color: var(--dim); font-size: clamp(11px, 2.2vmin, 26px); margin-bottom: 1.5vmin; }
+#time {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+  font-weight: 700; line-height: 1; white-space: pre; color: var(--lvl); font-variant-numeric: tabular-nums;
+}
+#sub { color: var(--dim); font-size: clamp(13px, 2.8vmin, 32px); margin-top: 2vmin; }
+#label:empty, #sub:empty { display: none; }
+
+#banner {
+  display: none; position: fixed; top: 0; left: 0; right: 0; text-align: center;
+  font-weight: 800; letter-spacing: .2em; font-size: clamp(20px, 6vmin, 80px); padding: 1.5vmin; pointer-events: none;
+}
+body.alarm #banner { display: block; }
+
+/* floating controls, hidden while idle */
+#chrome { transition: opacity .35s; }
+body.idle #chrome { opacity: 0; pointer-events: none; }
+body.idle.fs { cursor: none; }
+#chrome .corner { position: fixed; top: 12px; right: 12px; display: flex; gap: 8px; }
+#chrome .bottom { position: fixed; bottom: 14px; left: 50%; transform: translateX(-50%); display: flex; gap: 12px; align-items: center; }
+.fab, .pill button, #panel button, #panel input, #panel select {
+  font: inherit; color: var(--fg); background: transparent; border: 1px solid var(--line);
+  border-radius: 8px; padding: 7px 12px; min-height: 36px; cursor: pointer;
+}
+.fab { width: 44px; height: 44px; padding: 0; border-radius: 50%; font-size: 18px; background: var(--panel); color: var(--fg); border-color: var(--line); }
+.fab.main { width: 56px; height: 56px; background: var(--accent); color: var(--on-accent); border-color: var(--accent); font-size: 22px; }
+.pill { display: flex; background: var(--panel); border: 1px solid var(--line); border-radius: 999px; padding: 3px; }
+.pill button { border: 0; border-radius: 999px; min-height: 34px; padding: 4px 14px; }
+button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.pill button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
+body.alarm #chrome { --fg: #f2f5f7; --bg: #0b0d10; --line: #2a313a; --accent: #35d07f; --on-accent: #04170d; }
+:root[data-theme="light"] body.alarm #chrome { --fg: #14181c; --bg: #fafafa; --line: #d3d9df; --accent: #0f8a55; --on-accent: #ffffff; }
+
+/* settings drawer */
+#panel {
+  position: fixed; top: 0; right: 0; bottom: 0; width: min(94vw, 380px); overflow-y: auto;
+  background: var(--panel); color: var(--fg); border-left: 1px solid var(--line);
+  padding: 18px 18px 28px; transform: translateX(105%); transition: transform .25s; z-index: 5;
+  --fg: #f2f5f7; --dim: #7d8894; --line: #2a313a;
+}
+:root[data-theme="light"] #panel { --fg: #14181c; --dim: #6a7580; --line: #d3d9df; }
+#panel.open { transform: none; box-shadow: -12px 0 40px rgba(0, 0, 0, .35); }
+#panel header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
+#panel h2 { margin: 0; font-size: 1.15rem; }
+#panel h3 { margin: 18px 0 8px; font-size: .72rem; letter-spacing: .15em; text-transform: uppercase; color: var(--dim); }
+.row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
+.row.between { justify-content: space-between; flex-wrap: nowrap; }
+.seg { display: flex; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.seg button { border: 0; border-radius: 0; background: transparent; }
+.seg button + button { border-left: 1px solid var(--line); }
+#panel select { max-width: 100%; width: 100%; background: var(--bg); }
+#panel input[type="range"] { width: 100%; padding: 0; border: 0; min-height: 24px; accent-color: var(--accent); }
+#panel input { width: 9ch; text-align: center; font-variant-numeric: tabular-nums; background: var(--bg); }
+.switch { width: 46px; height: 26px; min-height: 0 !important; padding: 0 !important; border-radius: 999px !important; position: relative; }
+.switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: var(--dim); transition: transform .15s; }
+.switch[aria-checked="true"] { background: var(--accent); border-color: var(--accent); }
+.switch[aria-checked="true"]::after { transform: translateX(20px); background: var(--on-accent); }
+#panel code { display: block; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; overflow-x: auto; font-size: .8rem; margin: 6px 0; white-space: nowrap; }
+#panel p { margin: 6px 0; color: var(--dim); font-size: .85rem; line-height: 1.45; }
+#panel kbd { font-family: ui-monospace, Menlo, monospace; color: var(--accent); }
+</style>
+</head>
+<body data-view="clock" data-face="both" data-level="ok">
+<main id="stage">
+  <section id="analog" aria-label="Analog clock">
+    <svg id="face" viewBox="-100 -100 200 200" role="img" aria-label="Analog clock face"></svg>
+  </section>
+  <section id="digital" role="timer" aria-label="Digital display">
+    <div id="label"></div>
+    <div id="time">00:00:00</div>
+    <div id="sub"></div>
+  </section>
+</main>
+<div id="banner" aria-live="assertive">TIME'S UP</div>
+
+<div id="chrome">
+  <div class="corner">
+    <button id="fs" class="fab" type="button" aria-label="Full screen" title="Full screen (F)">&#x26F6;</button>
+    <button id="gear" class="fab" type="button" aria-label="Settings" title="Settings (S)">&#x2699;</button>
+  </div>
+  <div class="bottom">
+    <div class="pill" role="group" aria-label="Show">
+      <button data-k="view" data-v="clock" type="button">Clock</button>
+      <button data-k="view" data-v="timer" type="button">Timer</button>
+    </div>
+    <button id="go" class="fab main" type="button" aria-label="Start timer" title="Start or pause (Space)">&#x25B6;</button>
+  </div>
+</div>
+
+<aside id="panel" aria-label="Settings" aria-hidden="true">
+  <header><h2>BigTymers</h2><button id="close" type="button" aria-label="Close settings">&#x2715;</button></header>
+
+  <h3>Display</h3>
+  <div class="row"><div class="seg" role="group" aria-label="Face">
+    <button data-k="face" data-v="both" type="button">Both</button>
+    <button data-k="face" data-v="analog" type="button">Analog</button>
+    <button data-k="face" data-v="digital" type="button">Digital</button>
+  </div></div>
+  <div class="row between"><span>Show date and details</span><button class="switch" data-toggle="details" role="switch" type="button" aria-label="Show date and details"></button></div>
+  <div class="row between"><span>Analog numerals</span><button class="switch" data-toggle="numerals" role="switch" type="button" aria-label="Analog numerals"></button></div>
+  <div class="row between"><span>Dark theme</span><button class="switch" data-toggle="dark" role="switch" type="button" aria-label="Dark theme"></button></div>
+
+  <h3>Clock</h3>
+  <div class="row"><div class="seg" role="group" aria-label="Hour format">
+    <button data-k="h12" data-v="false" type="button">24 hour</button>
+    <button data-k="h12" data-v="true" type="button">12 hour AM/PM</button>
+  </div></div>
+  <div class="row between"><span>Show seconds</span><button class="switch" data-toggle="seconds" role="switch" type="button" aria-label="Show seconds"></button></div>
+  <div class="row"><label for="tz" style="color:var(--dim);font-size:.85rem">Time zone</label><select id="tz"></select></div>
+
+  <h3>Timer</h3>
+  <div class="row" id="presets">
+    <button data-min="5" type="button">5</button><button data-min="10" type="button">10</button>
+    <button data-min="15" type="button">15</button><button data-min="30" type="button">30</button>
+    <button data-min="45" type="button">45</button><button data-min="60" type="button">60</button>
+    <button data-min="90" type="button">90</button><button data-min="120" type="button">120</button>
+    <button data-min="180" type="button">180</button>
+  </div>
+  <div class="row">
+    <input id="dur" type="text" autocomplete="off" aria-label="Timer length, for example 45m or 1:30:00" value="10:00">
+    <button id="minus" type="button" aria-label="Remove one minute">&minus;1m</button>
+    <button id="plus" type="button" aria-label="Add one minute">+1m</button>
+    <button id="reset" type="button">Reset</button>
+  </div>
+
+  <h3>Alarm</h3>
+  <div class="row between"><span>Sound</span><button class="switch" data-toggle="sound" role="switch" type="button" aria-label="Alarm sound"></button></div>
+  <div class="row"><label for="tone" style="color:var(--dim);font-size:.85rem">Tone</label>
+    <select id="tone">
+      <option value="beep">Beep</option><option value="chime">Chime</option><option value="bell">Bell</option>
+      <option value="siren">Siren</option><option value="buzzer">Buzzer</option><option value="digital">Digital watch</option>
+    </select></div>
+  <div class="row"><label for="vol" style="color:var(--dim);font-size:.85rem">Volume</label>
+    <input id="vol" type="range" min="0.1" max="1" step="0.05" value="0.6" aria-label="Alarm volume"></div>
+  <div class="row"><label for="repeat" style="color:var(--dim);font-size:.85rem">Repeat</label>
+    <select id="repeat">
+      <option value="until">Until dismissed</option><option value="3">3 times</option><option value="1">Once</option>
+    </select></div>
+  <div class="row between"><span>Cue at 5 min and 1 min left</span><button class="switch" data-toggle="warn" role="switch" type="button" aria-label="Cue at 5 minutes and 1 minute left"></button></div>
+  <div class="row"><button id="test" type="button">Test sound</button></div>
+
+  <h3>Terminal</h3>
+  <p>Run it without downloading anything:</p>
+  <code id="cmd">curl -fsSL https://ceg.me/bigtymers/bigtymers.py | python3 - 45m</code>
+  <div class="row"><button id="copy" type="button">Copy command</button></div>
+
+  <h3>Shortcuts</h3>
+  <p><kbd>Space</kbd> start or pause, or dismiss the alarm. <kbd>V</kbd> clock or timer. <kbd>A</kbd> cycle faces. <kbd>F</kbd> full screen. <kbd>S</kbd> settings. <kbd>+</kbd> <kbd>&minus;</kbd> 1 minute, <kbd>&uarr;</kbd> <kbd>&darr;</kbd> 5 minutes. <kbd>R</kbd> reset. <kbd>H</kbd> 12 or 24 hour. <kbd>M</kbd> mute. Double click for full screen.</p>
+  <p>Link options: <kbd>?t=45m&amp;go&amp;face=analog&amp;tz=Europe/London&amp;h12=1&amp;seconds=0&amp;details=1</kbd></p>
+</aside>
+
+<script>
+(() => {
+  "use strict";
+  const $ = (s) => document.querySelector(s);
+  const $$ = (s) => Array.from(document.querySelectorAll(s));
+  const store = {
+    get(k, d) { try { const v = localStorage.getItem("bigtymers." + k); return v === null ? d : JSON.parse(v); } catch (e) { return d; } },
+    set(k, v) { try { localStorage.setItem("bigtymers." + k, JSON.stringify(v)); } catch (e) { /* storage unavailable */ } },
+  };
+  const pad = (n) => String(n).padStart(2, "0");
+
+  /** Parses 45, 45m, 90s, 1h30m, 1h30, mm:ss or hh:mm:ss into milliseconds, or null. */
+  function parseDuration(text) {
+    const s = String(text).trim().toLowerCase();
+    if (!s) return null;
+    let total;
+    if (s.includes(":")) {
+      const p = s.split(":").map((x) => (x === "" ? 0 : Number(x)));
+      if (p.length > 3 || p.some((x) => !isFinite(x) || x < 0)) return null;
+      while (p.length < 3) p.unshift(0);
+      total = p[0] * 3600 + p[1] * 60 + p[2];
+    } else if (/^(\s*\d+(\.\d+)?\s*[hms]?)+$/.test(s)) {
+      const scale = { h: 3600, m: 60, s: 1, "": 60 };
+      total = 0;
+      for (const m of s.matchAll(/(\d+(?:\.\d+)?)\s*([hms]?)/g)) total += parseFloat(m[1]) * scale[m[2]];
+    } else return null;
+    if (!(total > 0) || total > 99 * 3600) return null;
+    return Math.round(total * 1000);
+  }
+  function fmt(ms, withHours) {
+    const secs = Math.ceil(ms / 1000);
+    const h = Math.floor(secs / 3600), m = Math.floor((secs % 3600) / 60), s = secs % 60;
+    return withHours ? `${pad(h)}:${pad(m)}:${pad(s)}` : `${pad(h * 60 + m)}:${pad(s)}`;
+  }
+
+  // ---- state ----
+  const q = new URLSearchParams(location.search);
+  const FACES = ["both", "analog", "digital"];
+  const S = {
+    view: "clock",
+    face: store.get("face", "both"),
+    h12: store.get("h12", false),
+    seconds: store.get("seconds", true),
+    details: store.get("details", false),
+    numerals: store.get("numerals", true),
+    sound: store.get("sound", true),
+    tone: store.get("tone", "beep"),
+    volume: store.get("volume", 0.6),
+    repeat: store.get("repeat", "until"),
+    warn: store.get("warn", false),
+    dark: store.get("dark", true),
+    tz: store.get("tz", ""),
+    duration: store.get("duration", 10 * 60 * 1000),
+    left: 0, endAt: 0, running: false, alarm: false,
+  };
+  const flag = (k) => (q.get(k) === "1" || q.get(k) === "true" ? true : q.get(k) === "0" || q.get(k) === "false" ? false : null);
+  if (q.has("t")) { const d = parseDuration(q.get("t")); if (d) { S.duration = d; S.view = "timer"; } }
+  if (q.get("view") === "clock" || q.get("view") === "timer") S.view = q.get("view");
+  if (FACES.includes(q.get("face"))) S.face = q.get("face");
+  if (q.has("tz")) S.tz = q.get("tz");
+  for (const k of ["h12", "seconds", "details", "numerals"]) if (flag(k) !== null) S[k] = flag(k);
+  if (q.has("tone")) S.tone = q.get("tone");
+  if (q.get("theme") === "light") S.dark = false;
+  if (q.get("theme") === "dark") S.dark = true;
+  if (!FACES.includes(S.face)) S.face = "both";
+  S.left = S.duration;
+  const PERSIST = ["face", "h12", "seconds", "details", "numerals", "sound", "tone", "volume", "repeat", "warn", "dark", "tz"];
+
+  const remaining = () => (S.running ? Math.max(0, S.endAt - Date.now()) : S.left);
+
+  function start() {
+    ensureAudio(); wake();
+    if (S.left <= 0) S.left = S.duration;
+    warned = new Set([300000, 60000].filter((th) => S.left <= th));
+    S.endAt = Date.now() + S.left; S.running = true; stopAlarm(); sync();
+  }
+  function pause() { S.left = remaining(); S.running = false; sync(); }
+  function reset() { S.left = S.duration; S.running = false; stopAlarm(); sync(); }
+  function setDuration(ms) {
+    S.duration = ms; S.left = ms; S.running = false; stopAlarm();
+    store.set("duration", ms); sync();
+  }
+  function adjust(delta) {
+    S.duration = Math.max(1000, S.duration + delta);
+    if (S.running) S.endAt += delta; else S.left = Math.min(S.duration, Math.max(0, S.left + delta));
+    store.set("duration", S.duration); sync();
+  }
+  function toggleRun() {
+    if (S.alarm) { stopAlarm(); sync(); return; }
+    if (S.view !== "timer") S.view = "timer";
+    S.running ? pause() : start();
+  }
+
+  // ---- audio alarm ----
+  let ac = null, beepTimer = null;
+  function ensureAudio() {
+    try { ac = ac || new (window.AudioContext || window.webkitAudioContext)(); if (ac.state === "suspended") ac.resume(); } catch (e) { /* no audio */ }
+  }
+  function note(type, freq, at, dur, peak, freqEnd) {
+    const o = ac.createOscillator(), g = ac.createGain();
+    o.type = type; o.frequency.setValueAtTime(freq, at);
+    if (freqEnd) o.frequency.linearRampToValueAtTime(freqEnd, at + dur);
+    g.gain.setValueAtTime(0.0001, at);
+    g.gain.exponentialRampToValueAtTime(Math.max(0.0002, peak * S.volume), at + 0.01);
+    g.gain.exponentialRampToValueAtTime(0.0001, at + dur);
+    o.connect(g); g.connect(ac.destination); o.start(at); o.stop(at + dur + 0.02);
+  }
+  // Each tone plays one pattern starting at t; len is the seconds before the next repeat.
+  const TONES = {
+    beep: { len: 1.5, play: (t) => [0, 0.25, 0.5].forEach((d) => note("square", 880, t + d, 0.18, 0.25)) },
+    chime: { len: 2.2, play: (t) => [523, 659, 784, 1047].forEach((f, i) => note("sine", f, t + i * 0.22, 0.9, 0.35)) },
+    bell: { len: 3.2, play: (t) => [1, 2.76, 5.4].forEach((m, i) => note("sine", 660 * m, t, 2.4, 0.35 / (i + 1))) },
+    siren: { len: 2.0, play: (t) => [0, 0.8].forEach((d) => note("sawtooth", 600, t + d, 0.75, 0.2, 1000)) },
+    buzzer: { len: 1.8, play: (t) => [0, 0.75].forEach((d) => note("sawtooth", 140, t + d, 0.6, 0.4)) },
+    digital: { len: 1.6, play: (t) => [0, 0.12, 0.24, 0.36, 0.7, 0.82, 0.94, 1.06].forEach((d) => note("triangle", 1400, t + d, 0.08, 0.3)) },
+  };
+  const currentTone = () => TONES[S.tone] || TONES.beep;
+  function beep(force) {
+    if (!ac || (!S.sound && !force)) return;
+    currentTone().play(ac.currentTime + 0.02);
+  }
+  function ding(n) {
+    if (!ac || !S.sound) return;
+    const t = ac.currentTime + 0.02;
+    for (let i = 0; i < n; i++) note("sine", 1000, t + i * 0.3, 0.35, 0.3);
+  }
+  let ringCount = 0, warned = new Set();
+  function ringAlarm() {
+    const limit = S.repeat === "until" ? Infinity : Number(S.repeat);
+    if (!S.alarm || ringCount >= limit) { beepTimer = null; return; }
+    beep(); ringCount++;
+    beepTimer = setTimeout(ringAlarm, currentTone().len * 1000);
+  }
+  function startAlarm() { S.alarm = true; S.view = "timer"; ringCount = 0; clearTimeout(beepTimer); ringAlarm(); sync(); }
+  function stopAlarm() { S.alarm = false; clearTimeout(beepTimer); beepTimer = null; }
+
+  // ---- wake lock ----
+  let lock = null;
+  async function wake() {
+    try {
+      if ("wakeLock" in navigator && !lock && document.visibilityState === "visible") {
+        lock = await navigator.wakeLock.request("screen");
+        lock.addEventListener("release", () => { lock = null; });
+      }
+    } catch (e) { lock = null; }
+  }
+  document.addEventListener("visibilitychange", wake);
+
+  // ---- time zones ----
+  let dtf = null, dtfZone = null;
+  function zoned(date) {
+    const local = { h: date.getHours(), m: date.getMinutes(), s: date.getSeconds(), ms: date.getMilliseconds() };
+    if (!S.tz) return local;
+    try {
+      if (dtfZone !== S.tz) {
+        dtf = new Intl.DateTimeFormat("en-US", { timeZone: S.tz, hourCycle: "h23", hour: "numeric", minute: "numeric", second: "numeric" });
+        dtfZone = S.tz;
+      }
+      const p = {};
+      for (const x of dtf.formatToParts(date)) p[x.type] = x.value;
+      return { h: Number(p.hour) % 24, m: Number(p.minute), s: Number(p.second), ms: date.getMilliseconds() };
+    } catch (e) { S.tz = ""; dtfZone = null; return local; }
+  }
+  const zoneName = (tz) => tz.split("/").pop().replace(/_/g, " ");
+  function buildZones() {
+    const sel = $("#tz");
+    const common = ["UTC", "America/New_York", "America/Chicago", "America/Denver", "America/Los_Angeles", "America/Sao_Paulo", "Europe/London", "Europe/Paris", "Africa/Lagos", "Africa/Accra", "Africa/Johannesburg", "Asia/Dubai", "Asia/Kolkata", "Asia/Shanghai", "Asia/Tokyo", "Australia/Sydney", "Pacific/Auckland"];
+    let all = [];
+    try { all = Intl.supportedValuesOf("timeZone"); } catch (e) { all = common; }
+    const local = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+    const add = (parent, value, text) => { const o = document.createElement("option"); o.value = value; o.textContent = text; parent.appendChild(o); };
+    add(sel, "", `Local${local ? " (" + zoneName(local) + ")" : ""}`);
+    const g1 = document.createElement("optgroup"); g1.label = "Common"; sel.appendChild(g1);
+    common.forEach((z) => add(g1, z, z.replace(/_/g, " ")));
+    const g2 = document.createElement("optgroup"); g2.label = "All zones"; sel.appendChild(g2);
+    all.forEach((z) => add(g2, z, z.replace(/_/g, " ")));
+    if (S.tz && !Array.from(sel.options).some((o) => o.value === S.tz)) add(sel, S.tz, S.tz);
+  }
+
+  // ---- analog face ----
+  const NS = "http://www.w3.org/2000/svg";
+  function el(name, attrs, parent) {
+    const e = document.createElementNS(NS, name);
+    for (const k in attrs) e.setAttribute(k, attrs[k]);
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  const svg = $("#face");
+  el("circle", { r: 98, class: "rim" }, svg);
+  el("circle", { r: 79, class: "track" }, svg);
+  const ring = el("circle", { r: 79, class: "ring", pathLength: 100, transform: "rotate(-90)" }, svg);
+  for (let i = 0; i < 60; i++) {
+    const major = i % 5 === 0;
+    el("line", { x1: 0, y1: -95, x2: 0, y2: major ? -86 : -91, class: "tick" + (major ? " major" : ""), transform: `rotate(${i * 6})` }, svg);
+  }
+  const nums = [];
+  for (let n = 1; n <= 12; n++) {
+    const a = (n * 30 * Math.PI) / 180;
+    nums.push(el("text", { x: (Math.sin(a) * 66).toFixed(2), y: (-Math.cos(a) * 66).toFixed(2), class: "num" }, svg));
+  }
+  const hour = el("line", { id: "hour", x1: 0, y1: 8, x2: 0, y2: -40, class: "hand", "stroke-width": 5 }, svg);
+  const minute = el("line", { id: "minute", x1: 0, y1: 10, x2: 0, y2: -58, class: "hand", "stroke-width": 3.5 }, svg);
+  const second = el("line", { id: "second", x1: 0, y1: 14, x2: 0, y2: -74, class: "hand sec", "stroke-width": 1.6 }, svg);
+  el("circle", { r: 4.5, class: "hub" }, svg);
+  const rot = (e, deg) => e.setAttribute("transform", `rotate(${deg.toFixed(2)})`);
+  let numsFor = "";
+  function setNumerals(view) {
+    if (numsFor === view) return;
+    numsFor = view;
+    nums.forEach((t, i) => { t.textContent = view === "clock" ? String(i + 1) : String(((i + 1) * 5) % 60); });
+  }
+
+  // ---- digital fit ----
+  const timeEl = $("#time"), digital = $("#digital");
+  const probe = document.createElement("span");
+  probe.style.cssText = "position:absolute;visibility:hidden;white-space:pre;font:700 100px ui-monospace,'SF Mono',Menlo,Consolas,'DejaVu Sans Mono',monospace";
+  probe.textContent = "0000000000";
+  document.body.appendChild(probe);
+  function fit() {
+    const ratio = probe.getBoundingClientRect().width / 1000 || 0.6;
+    const n = timeEl.textContent.length || 8;
+    const byW = (digital.clientWidth * 0.96) / (n * ratio);
+    const byH = digital.clientHeight * 0.55;
+    timeEl.style.fontSize = Math.max(14, Math.min(byW, byH)) + "px";
+  }
+  new ResizeObserver(fit).observe(digital);
+
+  // ---- frame loop ----
+  let lastText = "", lastLabel = "", lastSub = "", lastTitle = "";
+  function frame() {
+    const now = new Date();
+    if (S.running && remaining() <= 0) { S.running = false; S.left = 0; startAlarm(); }
+    const rem = remaining();
+    if (S.running && S.warn) {
+      for (const th of [300000, 60000]) {
+        if (rem <= th && !warned.has(th)) { warned.add(th); ding(th === 60000 ? 2 : 1); }
+      }
+    }
+    const p = S.duration ? rem / S.duration : 0;
+    const longTimer = S.duration >= 3600000 || rem >= 3600000;
+    const timeStr = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+    let text, label = "", sub = "";
+    if (S.view === "clock") {
+      const z = zoned(now);
+      const hh = S.h12 ? z.h % 12 || 12 : z.h;
+      text = `${S.h12 ? String(hh).padStart(2, " ") : pad(hh)}:${pad(z.m)}${S.seconds ? ":" + pad(z.s) : ""}${S.h12 ? " " + (z.h >= 12 ? "PM" : "AM") : ""}`;
+      if (S.tz) label = zoneName(S.tz);
+      if (S.details) {
+        let opts = { weekday: "long", year: "numeric", month: "long", day: "numeric" };
+        if (S.tz) opts.timeZone = S.tz;
+        try { sub = now.toLocaleDateString(undefined, opts); } catch (e) { sub = ""; }
+        if (S.running || S.alarm || rem < S.duration) sub += `  ·  timer ${fmt(rem, longTimer)}`;
+      }
+      const secs = z.s + z.ms / 1000;
+      const mins = z.m + secs / 60;
+      rot(hour, ((z.h % 12) + mins / 60) * 30);
+      rot(minute, mins * 6);
+      rot(second, secs * 6);
+      ring.setAttribute("stroke-dasharray", "0 100");
+    } else {
+      text = fmt(rem, longTimer);
+      label = S.alarm ? "Time’s up" : S.running ? "" : rem >= S.duration ? "Ready" : "Paused";
+      if (S.details) {
+        label = S.alarm ? "Time’s up" : S.running ? "Time left" : label;
+        sub = `Now ${timeStr(now)}`;
+        if (S.running) sub += `  ·  ends ${timeStr(new Date(now.getTime() + rem))}`;
+      }
+      const r = rem / 1000;
+      rot(minute, ((r / 60) % 60) * 6);
+      rot(second, (r % 60) * 6);
+      ring.setAttribute("stroke-dasharray", `${(Math.max(0, p) * 100).toFixed(3)} 100`);
+      const danger = rem <= Math.min(300000, S.duration * 0.1);
+      const warn = rem <= Math.min(900000, S.duration * 0.25);
+      document.body.dataset.level = danger ? "danger" : warn ? "warn" : "ok";
+    }
+    setNumerals(S.view);
+    if (text !== lastText) { const lenChanged = text.length !== lastText.length; timeEl.textContent = text; lastText = text; if (lenChanged) fit(); }
+    if (label !== lastLabel) { $("#label").textContent = label; lastLabel = label; }
+    if (sub !== lastSub) { $("#sub").textContent = sub; lastSub = sub; }
+    const flashOn = S.alarm && Math.floor(Date.now() / 500) % 2 === 0;
+    const title = S.alarm ? (flashOn ? "⏰ TIME’S UP" : "TIME’S UP") : S.view === "timer" ? `${text} · BigTymers` : "BigTymers";
+    if (title !== lastTitle) { document.title = title; lastTitle = title; }
+    requestAnimationFrame(frame);
+  }
+
+  // ---- controls ----
+  function sync() {
+    const b = document.body;
+    document.documentElement.dataset.theme = S.dark ? "dark" : "light";
+    b.dataset.view = S.view;
+    b.dataset.face = S.face;
+    b.dataset.numerals = S.numerals ? "on" : "off";
+    b.dataset.seconds = S.seconds ? "on" : "off";
+    b.classList.toggle("alarm", S.alarm);
+    $$("[data-k]").forEach((e) => e.setAttribute("aria-pressed", String(S[e.dataset.k]) === e.dataset.v));
+    $$("[data-toggle]").forEach((e) => e.setAttribute("aria-checked", String(!!S[e.dataset.toggle])));
+    $$("[data-min]").forEach((e) => e.setAttribute("aria-pressed", Number(e.dataset.min) * 60000 === S.duration));
+    $("#tz").value = S.tz;
+    if ($("#tz").value !== S.tz) $("#tz").value = "";
+    $("#tone").value = TONES[S.tone] ? S.tone : "beep";
+    $("#repeat").value = S.repeat;
+    $("#vol").value = S.volume;
+    const go = $("#go");
+    go.textContent = S.alarm ? "✕" : S.running ? "⏸" : "▶";
+    go.setAttribute("aria-label", S.alarm ? "Dismiss alarm" : S.running ? "Pause timer" : "Start timer");
+    if (document.activeElement !== $("#dur")) $("#dur").value = fmt(S.duration, S.duration >= 3600000);
+    PERSIST.forEach((k) => store.set(k, S[k]));
+    requestAnimationFrame(fit);
+  }
+  const cycleFace = () => { S.face = FACES[(FACES.indexOf(S.face) + 1) % FACES.length]; sync(); };
+  function toggleFs() {
+    const de = document.documentElement;
+    if (document.fullscreenElement || document.webkitFullscreenElement) {
+      (document.exitFullscreen || document.webkitExitFullscreen).call(document);
+    } else {
+      const f = de.requestFullscreen || de.webkitRequestFullscreen;
+      if (f) { const r = f.call(de); if (r && r.catch) r.catch(() => {}); }
+    }
+  }
+  const panel = $("#panel");
+  function setPanel(open) {
+    panel.classList.toggle("open", open);
+    panel.setAttribute("aria-hidden", String(!open));
+    if (open) { document.body.classList.remove("idle"); $("#close").focus(); } else if (panel.contains(document.activeElement)) document.activeElement.blur();
+  }
+  const panelOpen = () => panel.classList.contains("open");
+
+  document.addEventListener("click", (e) => {
+    const t = e.target.closest("button");
+    if (t && t.dataset.k) {
+      const v = t.dataset.v;
+      S[t.dataset.k] = v === "true" ? true : v === "false" ? false : v;
+      sync();
+    } else if (t && t.dataset.toggle) {
+      S[t.dataset.toggle] = !S[t.dataset.toggle];
+      if (t.dataset.toggle === "sound" && S.sound) { ensureAudio(); beep(); }
+      sync();
+    } else if (t && t.dataset.min) {
+      setDuration(Number(t.dataset.min) * 60000); S.view = "timer"; sync();
+    }
+    if (t && e.detail > 0 && !panel.contains(t)) t.blur();
+    if (panelOpen() && !panel.contains(e.target) && !e.target.closest("#gear")) setPanel(false);
+    else if (S.alarm && e.target.closest("#stage")) { stopAlarm(); sync(); }
+  });
+  $("#minus").onclick = () => adjust(-60000);
+  $("#plus").onclick = () => adjust(60000);
+  $("#go").onclick = toggleRun;
+  $("#reset").onclick = reset;
+  $("#fs").onclick = toggleFs;
+  $("#gear").onclick = () => setPanel(!panelOpen());
+  $("#close").onclick = () => setPanel(false);
+  $("#tz").onchange = (e) => { S.tz = e.target.value; dtfZone = null; sync(); };
+  $("#tone").onchange = (e) => { S.tone = e.target.value; sync(); ensureAudio(); beep(true); };
+  $("#repeat").onchange = (e) => { S.repeat = e.target.value; sync(); };
+  $("#vol").oninput = (e) => { S.volume = Number(e.target.value); PERSIST.forEach((k) => store.set(k, S[k])); };
+  $("#vol").onchange = () => { ensureAudio(); beep(true); };
+  $("#test").onclick = () => { ensureAudio(); beep(true); };
+  $("#copy").onclick = async () => {
+    try { await navigator.clipboard.writeText($("#cmd").textContent); $("#copy").textContent = "Copied"; } catch (e) { $("#copy").textContent = "Select and copy"; }
+    setTimeout(() => ($("#copy").textContent = "Copy command"), 1500);
+  };
+  const dur = $("#dur");
+  const commitDur = () => {
+    const d = parseDuration(dur.value);
+    if (d) { setDuration(d); S.view = "timer"; }
+    sync();
+    dur.value = fmt(S.duration, S.duration >= 3600000);
+  };
+  dur.addEventListener("change", commitDur);
+  dur.addEventListener("keydown", (e) => { if (e.key === "Enter") { commitDur(); dur.blur(); } });
+
+  document.addEventListener("keydown", (e) => {
+    if (e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.key === "Escape" && panelOpen()) { setPanel(false); return; }
+    if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
+    if (S.alarm && e.key !== "f" && e.key !== "F") { stopAlarm(); sync(); e.preventDefault(); return; }
+    const k = e.key;
+    if (k === " ") { e.preventDefault(); toggleRun(); }
+    else if (k === "Enter") { if (e.target.tagName !== "BUTTON") toggleRun(); }
+    else if (k === "v" || k === "V") { S.view = S.view === "clock" ? "timer" : "clock"; sync(); }
+    else if (k === "a" || k === "A") cycleFace();
+    else if (k === "f" || k === "F") toggleFs();
+    else if (k === "s" || k === "S" || k === "?") setPanel(!panelOpen());
+    else if (k === "r" || k === "R") reset();
+    else if (k === "+" || k === "=") adjust(60000);
+    else if (k === "-" || k === "_") adjust(-60000);
+    else if (k === "ArrowUp") { e.preventDefault(); adjust(300000); }
+    else if (k === "ArrowDown") { e.preventDefault(); adjust(-300000); }
+    else if (k === "h" || k === "H") { S.h12 = !S.h12; sync(); }
+    else if (k === "m" || k === "M") { S.sound = !S.sound; sync(); }
+  });
+  $("#stage").addEventListener("dblclick", toggleFs);
+
+  // fade the floating controls after a few idle seconds
+  let idleTimer = null;
+  function poke() {
+    document.body.classList.remove("idle");
+    clearTimeout(idleTimer);
+    idleTimer = setTimeout(() => { if (!panelOpen()) document.body.classList.add("idle"); }, 3000);
+  }
+  ["mousemove", "pointerdown", "keydown", "touchstart"].forEach((ev) => document.addEventListener(ev, poke, { passive: true }));
+  function fsChange() { document.body.classList.toggle("fs", !!(document.fullscreenElement || document.webkitFullscreenElement)); poke(); setTimeout(fit, 50); }
+  document.addEventListener("fullscreenchange", fsChange);
+  document.addEventListener("webkitfullscreenchange", fsChange);
+  const firstGesture = () => { ensureAudio(); wake(); };
+  document.addEventListener("pointerdown", firstGesture, { once: true });
+  document.addEventListener("keydown", firstGesture, { once: true });
+
+  buildZones();
+  sync();
+  poke();
+  if (q.has("go") && q.has("t")) { S.view = "timer"; start(); }
+  wake();
+  requestAnimationFrame(frame);
+})();
+</script>
+</body>
+</html>
