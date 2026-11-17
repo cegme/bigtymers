@@ -37,6 +37,28 @@ uvx --from git+https://github.com/cegme/bigtymers btyme 45m
 
 The last line runs it once without installing.
 
+## Debian, Ubuntu, Fedora and Red Hat
+
+Each release has a `.deb` and an `.rpm` package that install `btyme` system wide.
+
+```
+# Debian and Ubuntu
+curl -fsSLO https://github.com/cegme/bigtymers/releases/latest/download/btyme_all.deb
+sudo apt install ./btyme_all.deb
+
+# Fedora, RHEL, Rocky Linux and AlmaLinux
+sudo dnf install https://github.com/cegme/bigtymers/releases/latest/download/btyme.noarch.rpm
+```
+
+Remove them with `sudo apt remove btyme` or `sudo dnf remove btyme`.
+
+The packages need Python 3.9 or newer.
+That is included in Debian 11 and later, Ubuntu 22.04 and later, Fedora, and RHEL 9 and later.
+On RHEL 8 install `python39` and start it with `python3.9 /usr/bin/btyme`.
+
+To build the packages yourself, run `sh packaging/build-deb.sh` (needs `dpkg-deb`) or `sh packaging/build-rpm.sh` (needs `rpmbuild`).
+Pushing a tag such as `v0.1.1` builds both and publishes a release through GitHub Actions.
+
 ## Display
 
 Both versions show an analog face, a digital face, or both.
