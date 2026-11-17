@@ -90,7 +90,7 @@ Open settings with the gear or the `s` key.
 | m | Mute the alarm |
 
 Settings include face, 12 or 24 hour time, seconds, time zone, date line, analog numerals, theme, timer presets and the alarm.
-The alarm has 6 tones (beep, chime, bell, siren, buzzer, digital watch), a volume slider, a repeat count, and an optional cue at 5 minutes and 1 minute left.
+The alarm has 6 tones (beep, chime, bell, siren, buzzer, digital watch), a volume slider, a repeat count (3 times by default), and an optional cue at 5 minutes and 1 minute left.
 Settings are remembered in the browser.
 The screen is kept awake while the page is open.
 
@@ -149,7 +149,8 @@ Make the terminal window full screen for the largest display.
 | m | Mute |
 | q | Quit |
 
-The alarm flashes the screen and rings the terminal bell.
+The alarm flashes the screen until it is dismissed and rings the terminal bell 3 times.
+`--repeat N` changes the count, and `--repeat 0` rings until dismissed.
 `--sound` plays a file instead.
 On macOS use a system sound name such as Glass, Submarine or Hero, or a path to an audio file.
 Playback uses `afplay`, `paplay` or `aplay`, whichever is installed.

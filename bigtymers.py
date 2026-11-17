@@ -133,7 +133,7 @@ def level(remaining, duration):
 class State:
     """Timer and display state."""
 
-    def __init__(self, duration, view, face, twelve, bell, zones=None, seconds=True, details=False, sound=None):
+    def __init__(self, duration, view, face, twelve, bell, zones=None, seconds=True, details=False, sound=None, repeat=3):
         """Creates the state.
 
         Args:
@@ -146,6 +146,7 @@ class State:
             seconds: Whether the clock shows seconds.
             details: Whether the header and help lines are shown.
             sound: Path of an audio file to play for the alarm instead of the bell.
+            repeat: How many times the alarm sounds, or 0 to sound until dismissed.
         """
         self.duration = float(duration)
         self.left = float(duration)
@@ -161,6 +162,8 @@ class State:
         self.seconds = seconds
         self.details = details
         self.sound = sound
+        self.repeat = repeat
+        self.player = None
 
     def remaining(self):
         """Returns the seconds left on the timer."""
@@ -473,16 +476,26 @@ def resolve_sound(spec):
 
 
 def play_alarm(st):
-    """Rings the alarm using the chosen sound file, or the terminal bell."""
+    """Rings the alarm using the chosen sound file, or the terminal bell.
+
+    Args:
+        st: The State.
+
+    Returns:
+        False if a previous sound file is still playing, otherwise True.
+    """
+    if st.player is not None and st.player.poll() is None:
+        return False
     player = find_player() if st.sound else None
     if player:
-        subprocess.Popen(
+        st.player = subprocess.Popen(
             [player, st.sound],
             stdout=subprocess.DEVNULL,
             stderr=subprocess.DEVNULL,
         )
     else:
         sys.stdout.write("\a")
+    return True
 
 
 def handle_keys(data, st):
@@ -550,14 +563,18 @@ def run(st):
     old = termios.tcgetattr(fd)
     out = sys.stdout
     flash = False
+    rings = 0
     try:
         tty.setcbreak(fd)
         out.write(ENTER_SCREEN)
         while True:
             st.tick()
             new_flash = st.alarm and int(time.monotonic() * 2) % 2 == 0
-            if new_flash and not flash and st.bell:
-                play_alarm(st)
+            if not st.alarm:
+                rings = 0
+            elif new_flash and not flash and st.bell:
+                if (st.repeat == 0 or rings < st.repeat) and play_alarm(st):
+                    rings += 1
             flash = new_flash
             w, h = shutil.get_terminal_size()
             out.write(render(st, w, h, flash))
@@ -604,6 +621,12 @@ def main(argv=None):
         help="time zones for the clock, comma separated, local first if you list 'local' "
         "(example: America/New_York,Europe/London); press z to cycle",
     )
+    parser.add_argument(
+        "--repeat",
+        type=int,
+        default=3,
+        help="times the alarm sounds, 0 to sound until dismissed (default 3); the flashing continues until dismissed",
+    )
     parser.add_argument("--no-seconds", action="store_true", help="hide seconds on the clock")
     parser.add_argument("--details", action="store_true", help="show the header and help lines")
     parser.add_argument(
@@ -645,6 +668,7 @@ def main(argv=None):
         seconds=not args.no_seconds,
         details=args.details,
         sound=sound,
+        repeat=max(0, args.repeat),
     )
     if args.duration and not args.paused:
         st.start()
