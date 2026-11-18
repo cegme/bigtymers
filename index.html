@@ -36,7 +36,7 @@ body.alarm { animation: flash 1s steps(1) infinite; --fg: currentColor; --dim: c
 
 /* main display */
 #stage {
-  position: fixed; inset: 0; display: grid; gap: 3vmin; padding: 4vmin;
+  position: fixed; inset: 0; display: grid; gap: 3vmin; padding: 4vmin 4vmin max(4vmin, 88px);
   grid-template-columns: minmax(0, 1fr);
   grid-template-rows: minmax(0, 3fr) minmax(0, 2fr);
 }
@@ -69,7 +69,29 @@ body[data-view="clock"][data-seconds="off"] #second, body[data-view="clock"][dat
   font-weight: 700; line-height: 1; white-space: pre; color: var(--lvl); font-variant-numeric: tabular-nums;
 }
 #sub { color: var(--dim); font-size: clamp(13px, 2.8vmin, 32px); margin-top: 2vmin; }
-#label:empty, #sub:empty { display: none; }
+#now {
+  font-family: ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+  font-weight: 600; line-height: 1; white-space: pre; color: var(--dim); font-variant-numeric: tabular-nums; margin-top: 2.5vmin;
+}
+#label:empty, #sub:empty, #now:empty { display: none; }
+
+/* instructor FAQ */
+body[data-faq="off"] #faqbtn, body[data-faq="off"] #faqsec { display: none; }
+#faq {
+  position: fixed; inset: 0; z-index: 3; overflow-y: auto; background: var(--bg); color: var(--fg);
+  padding: 6vmin 8vmin max(6vmin, 96px); display: none;
+}
+#faq.open { display: block; }
+#faq h2 { margin: 0 0 3vmin; font-size: clamp(22px, 5vmin, 60px); letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+#faqtext { white-space: pre-wrap; overflow-wrap: anywhere; font-size: clamp(18px, 4vmin, 48px); line-height: 1.4; max-width: 60ch; }
+#faqtext:empty::before { content: "No notes yet. Add them in Settings."; color: var(--dim); }
+#faqclose { position: fixed; top: 12px; left: 12px; z-index: 4; }
+#chrome { z-index: 4; position: relative; }
+#panel textarea {
+  font: inherit; color: var(--fg); background: var(--bg); border: 1px solid var(--line); border-radius: 8px;
+  padding: 8px 10px; width: 100%; min-height: 160px; resize: vertical; line-height: 1.4;
+}
+#panel textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 
 #banner {
   display: none; position: fixed; top: 0; left: 0; right: 0; text-align: center;
@@ -93,6 +115,7 @@ body.idle.fs { cursor: none; }
 .pill button { border: 0; border-radius: 999px; min-height: 34px; padding: 4px 14px; }
 button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
 .pill button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+#panel button[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
 button:focus-visible, input:focus-visible, select:focus-visible { outline: 2px solid var(--accent); outline-offset: 1px; }
 body.alarm #chrome { --fg: #f2f5f7; --bg: #0b0d10; --line: #2a313a; --accent: #35d07f; --on-accent: #04170d; }
 :root[data-theme="light"] body.alarm #chrome { --fg: #14181c; --bg: #fafafa; --line: #d3d9df; --accent: #0f8a55; --on-accent: #ffffff; }
@@ -119,8 +142,8 @@ body.alarm #chrome { --fg: #f2f5f7; --bg: #0b0d10; --line: #2a313a; --accent: #3
 #panel input { width: 9ch; text-align: center; font-variant-numeric: tabular-nums; background: var(--bg); }
 .switch { width: 46px; height: 26px; min-height: 0 !important; padding: 0 !important; border-radius: 999px !important; position: relative; }
 .switch::after { content: ""; position: absolute; top: 2px; left: 2px; width: 20px; height: 20px; border-radius: 50%; background: var(--dim); transition: transform .15s; }
-.switch[aria-checked="true"] { background: var(--accent); border-color: var(--accent); }
-.switch[aria-checked="true"]::after { transform: translateX(20px); background: var(--on-accent); }
+#panel .switch[aria-checked="true"] { background: var(--accent); border-color: var(--accent); }
+#panel .switch[aria-checked="true"]::after { transform: translateX(20px); background: var(--on-accent); }
 #panel code { display: block; background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; overflow-x: auto; font-size: .8rem; margin: 6px 0; white-space: nowrap; }
 #panel p { margin: 6px 0; color: var(--dim); font-size: .85rem; line-height: 1.45; }
 #panel kbd { font-family: ui-monospace, Menlo, monospace; color: var(--accent); }
@@ -134,9 +157,15 @@ body.alarm #chrome { --fg: #f2f5f7; --bg: #0b0d10; --line: #2a313a; --accent: #3
   <section id="digital" role="timer" aria-label="Digital display">
     <div id="label"></div>
     <div id="time">00:00:00</div>
+    <div id="now"></div>
     <div id="sub"></div>
   </section>
 </main>
+<section id="faq" role="dialog" aria-label="Test FAQ" aria-hidden="true">
+  <h2>FAQ</h2>
+  <div id="faqtext"></div>
+</section>
+<button id="faqclose" class="fab" type="button" aria-label="Close FAQ" title="Close (Esc)" hidden>&#x2715;</button>
 <div id="banner" aria-live="assertive">TIME'S UP</div>
 
 <div id="chrome">
@@ -148,6 +177,7 @@ body.alarm #chrome { --fg: #f2f5f7; --bg: #0b0d10; --line: #2a313a; --accent: #3
     <div class="pill" role="group" aria-label="Show">
       <button data-k="view" data-v="clock" type="button">Clock</button>
       <button data-k="view" data-v="timer" type="button">Timer</button>
+      <button id="faqbtn" type="button" aria-pressed="false" title="Show the FAQ (N)">FAQ</button>
     </div>
     <button id="go" class="fab main" type="button" aria-label="Start timer" title="Start or pause (Space)">&#x25B6;</button>
   </div>
@@ -164,6 +194,7 @@ body.alarm #chrome { --fg: #f2f5f7; --bg: #0b0d10; --line: #2a313a; --accent: #3
   </div></div>
   <div class="row between"><span>Show date and details</span><button class="switch" data-toggle="details" role="switch" type="button" aria-label="Show date and details"></button></div>
   <div class="row between"><span>Analog numerals</span><button class="switch" data-toggle="numerals" role="switch" type="button" aria-label="Analog numerals"></button></div>
+  <div class="row between"><span>Current time under timer</span><button class="switch" data-toggle="nowtime" role="switch" type="button" aria-label="Show current time under the timer"></button></div>
   <div class="row between"><span>Dark theme</span><button class="switch" data-toggle="dark" role="switch" type="button" aria-label="Dark theme"></button></div>
 
   <h3>Clock</h3>
@@ -205,14 +236,22 @@ body.alarm #chrome { --fg: #f2f5f7; --bg: #0b0d10; --line: #2a313a; --accent: #3
   <div class="row between"><span>Cue at 5 min and 1 min left</span><button class="switch" data-toggle="warn" role="switch" type="button" aria-label="Cue at 5 minutes and 1 minute left"></button></div>
   <div class="row"><button id="test" type="button">Test sound</button></div>
 
+  <h3>FAQ</h3>
+  <div class="row between"><span>Instructor FAQ</span><button class="switch" data-toggle="faq" role="switch" type="button" aria-label="Enable instructor FAQ"></button></div>
+  <div id="faqsec">
+    <p>Write notes about the test for students. Use the FAQ button, or <kbd>N</kbd>, to show them full screen. Notes stay in this browser.</p>
+    <div class="row"><textarea id="notes" aria-label="FAQ notes" placeholder="Calculators allowed.&#10;Bathroom breaks: raise your hand.&#10;Answers go on the back page."></textarea></div>
+    <div class="row"><button id="faqopen" type="button">Show FAQ</button></div>
+  </div>
+
   <h3>Terminal</h3>
   <p>Run it without downloading anything:</p>
   <code id="cmd">curl -fsSL https://ceg.me/bigtymers/bigtymers.py | python3 - 45m</code>
   <div class="row"><button id="copy" type="button">Copy command</button></div>
 
   <h3>Shortcuts</h3>
-  <p><kbd>Space</kbd> start or pause, or dismiss the alarm. <kbd>V</kbd> clock or timer. <kbd>A</kbd> cycle faces. <kbd>F</kbd> full screen. <kbd>S</kbd> settings. <kbd>+</kbd> <kbd>&minus;</kbd> 1 minute, <kbd>&uarr;</kbd> <kbd>&darr;</kbd> 5 minutes. <kbd>R</kbd> reset. <kbd>H</kbd> 12 or 24 hour. <kbd>M</kbd> mute. Double click for full screen.</p>
-  <p>Link options: <kbd>?t=45m&amp;go&amp;face=analog&amp;tz=Europe/London&amp;h12=1&amp;seconds=0&amp;details=1</kbd></p>
+  <p><kbd>Space</kbd> start or pause, or dismiss the alarm. <kbd>V</kbd> clock or timer. <kbd>A</kbd> cycle faces. <kbd>F</kbd> full screen. <kbd>S</kbd> settings. <kbd>+</kbd> <kbd>&minus;</kbd> 1 minute, <kbd>&uarr;</kbd> <kbd>&darr;</kbd> 5 minutes. <kbd>R</kbd> reset. <kbd>H</kbd> 12 or 24 hour. <kbd>M</kbd> mute. <kbd>N</kbd> FAQ when enabled. Double click for full screen.</p>
+  <p>Link options: <kbd>?t=45m&amp;go&amp;face=analog&amp;tz=Europe/London&amp;h12=1&amp;seconds=0&amp;details=1&amp;now=1&amp;faq=1</kbd></p>
 </aside>
 
 <script>
@@ -266,6 +305,10 @@ body.alarm #chrome { --fg: #f2f5f7; --bg: #0b0d10; --line: #2a313a; --accent: #3
     repeat: store.get("repeat", "3"),
     warn: store.get("warn", false),
     dark: store.get("dark", true),
+    nowtime: store.get("nowtime", false),
+    faq: store.get("faq", false),
+    notes: store.get("notes", ""),
+    faqOpen: false,
     tz: store.get("tz", ""),
     duration: store.get("duration", 10 * 60 * 1000),
     left: 0, endAt: 0, running: false, alarm: false,
@@ -276,12 +319,14 @@ body.alarm #chrome { --fg: #f2f5f7; --bg: #0b0d10; --line: #2a313a; --accent: #3
   if (FACES.includes(q.get("face"))) S.face = q.get("face");
   if (q.has("tz")) S.tz = q.get("tz");
   for (const k of ["h12", "seconds", "details", "numerals"]) if (flag(k) !== null) S[k] = flag(k);
+  if (flag("now") !== null) S.nowtime = flag("now");
+  if (flag("faq") !== null) S.faq = flag("faq");
   if (q.has("tone")) S.tone = q.get("tone");
   if (q.get("theme") === "light") S.dark = false;
   if (q.get("theme") === "dark") S.dark = true;
   if (!FACES.includes(S.face)) S.face = "both";
   S.left = S.duration;
-  const PERSIST = ["face", "h12", "seconds", "details", "numerals", "sound", "tone", "volume", "repeat", "warn", "dark", "tz"];
+  const PERSIST = ["face", "h12", "seconds", "details", "numerals", "sound", "tone", "volume", "repeat", "warn", "dark", "tz", "nowtime", "faq", "notes"];
 
   const remaining = () => (S.running ? Math.max(0, S.endAt - Date.now()) : S.left);
 
@@ -348,7 +393,7 @@ body.alarm #chrome { --fg: #f2f5f7; --bg: #0b0d10; --line: #2a313a; --accent: #3
     beep(); ringCount++;
     beepTimer = setTimeout(ringAlarm, currentTone().len * 1000);
   }
-  function startAlarm() { S.alarm = true; S.view = "timer"; ringCount = 0; clearTimeout(beepTimer); ringAlarm(); sync(); }
+  function startAlarm() { S.alarm = true; S.faqOpen = false; S.view = "timer"; ringCount = 0; clearTimeout(beepTimer); ringAlarm(); sync(); }
   function stopAlarm() { S.alarm = false; clearTimeout(beepTimer); beepTimer = null; }
 
   // ---- wake lock ----
@@ -428,7 +473,7 @@ body.alarm #chrome { --fg: #f2f5f7; --bg: #0b0d10; --line: #2a313a; --accent: #3
   }
 
   // ---- digital fit ----
-  const timeEl = $("#time"), digital = $("#digital");
+  const nowEl = $("#now"), timeEl = $("#time"), digital = $("#digital");
   const probe = document.createElement("span");
   probe.style.cssText = "position:absolute;visibility:hidden;white-space:pre;font:700 100px ui-monospace,'SF Mono',Menlo,Consolas,'DejaVu Sans Mono',monospace";
   probe.textContent = "0000000000";
@@ -438,12 +483,19 @@ body.alarm #chrome { --fg: #f2f5f7; --bg: #0b0d10; --line: #2a313a; --accent: #3
     const n = timeEl.textContent.length || 8;
     const byW = (digital.clientWidth * 0.96) / (n * ratio);
     const byH = digital.clientHeight * 0.55;
-    timeEl.style.fontSize = Math.max(14, Math.min(byW, byH)) + "px";
+    const size = Math.max(14, Math.min(byW, byH));
+    timeEl.style.fontSize = size + "px";
+    nowEl.style.fontSize = Math.max(12, Math.min(size * 0.3, (digital.clientWidth * 0.9) / ((nowEl.textContent.length || 8) * ratio))) + "px";
   }
   new ResizeObserver(fit).observe(digital);
 
+  function clockText(z) {
+    const hh = S.h12 ? z.h % 12 || 12 : z.h;
+    return `${S.h12 ? String(hh).padStart(2, " ") : pad(hh)}:${pad(z.m)}${S.seconds ? ":" + pad(z.s) : ""}${S.h12 ? " " + (z.h >= 12 ? "PM" : "AM") : ""}`;
+  }
+
   // ---- frame loop ----
-  let lastText = "", lastLabel = "", lastSub = "", lastTitle = "";
+  let lastNow = "", lastText = "", lastLabel = "", lastSub = "", lastTitle = "";
   function frame() {
     const now = new Date();
     if (S.running && remaining() <= 0) { S.running = false; S.left = 0; startAlarm(); }
@@ -456,11 +508,10 @@ body.alarm #chrome { --fg: #f2f5f7; --bg: #0b0d10; --line: #2a313a; --accent: #3
     const p = S.duration ? rem / S.duration : 0;
     const longTimer = S.duration >= 3600000 || rem >= 3600000;
     const timeStr = (d) => `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-    let text, label = "", sub = "";
+    let text, label = "", sub = "", nowText = "";
     if (S.view === "clock") {
       const z = zoned(now);
-      const hh = S.h12 ? z.h % 12 || 12 : z.h;
-      text = `${S.h12 ? String(hh).padStart(2, " ") : pad(hh)}:${pad(z.m)}${S.seconds ? ":" + pad(z.s) : ""}${S.h12 ? " " + (z.h >= 12 ? "PM" : "AM") : ""}`;
+      text = clockText(z);
       if (S.tz) label = zoneName(S.tz);
       if (S.details) {
         let opts = { weekday: "long", year: "numeric", month: "long", day: "numeric" };
@@ -476,6 +527,7 @@ body.alarm #chrome { --fg: #f2f5f7; --bg: #0b0d10; --line: #2a313a; --accent: #3
       ring.setAttribute("stroke-dasharray", "0 100");
     } else {
       text = fmt(rem, longTimer);
+      if (S.nowtime) nowText = clockText(zoned(now));
       label = S.alarm ? "Time’s up" : S.running ? "" : rem >= S.duration ? "Ready" : "Paused";
       if (S.details) {
         label = S.alarm ? "Time’s up" : S.running ? "Time left" : label;
@@ -493,6 +545,7 @@ body.alarm #chrome { --fg: #f2f5f7; --bg: #0b0d10; --line: #2a313a; --accent: #3
     setNumerals(S.view);
     if (text !== lastText) { const lenChanged = text.length !== lastText.length; timeEl.textContent = text; lastText = text; if (lenChanged) fit(); }
     if (label !== lastLabel) { $("#label").textContent = label; lastLabel = label; }
+    if (nowText !== lastNow) { nowEl.textContent = nowText; lastNow = nowText; fit(); }
     if (sub !== lastSub) { $("#sub").textContent = sub; lastSub = sub; }
     const flashOn = S.alarm && Math.floor(Date.now() / 500) % 2 === 0;
     const title = S.alarm ? (flashOn ? "⏰ TIME’S UP" : "TIME’S UP") : S.view === "timer" ? `${text} · BigTymers` : "BigTymers";
@@ -508,6 +561,14 @@ body.alarm #chrome { --fg: #f2f5f7; --bg: #0b0d10; --line: #2a313a; --accent: #3
     b.dataset.face = S.face;
     b.dataset.numerals = S.numerals ? "on" : "off";
     b.dataset.seconds = S.seconds ? "on" : "off";
+    b.dataset.faq = S.faq ? "on" : "off";
+    if (!S.faq) S.faqOpen = false;
+    $("#faq").classList.toggle("open", S.faqOpen);
+    $("#faq").setAttribute("aria-hidden", String(!S.faqOpen));
+    $("#faqclose").hidden = !S.faqOpen;
+    $("#faqbtn").setAttribute("aria-pressed", String(S.faqOpen));
+    $("#faqtext").textContent = S.notes.trim();
+    if (document.activeElement !== $("#notes")) $("#notes").value = S.notes;
     b.classList.toggle("alarm", S.alarm);
     $$("[data-k]").forEach((e) => e.setAttribute("aria-pressed", String(S[e.dataset.k]) === e.dataset.v));
     $$("[data-toggle]").forEach((e) => e.setAttribute("aria-checked", String(!!S[e.dataset.toggle])));
@@ -547,6 +608,7 @@ body.alarm #chrome { --fg: #f2f5f7; --bg: #0b0d10; --line: #2a313a; --accent: #3
     if (t && t.dataset.k) {
       const v = t.dataset.v;
       S[t.dataset.k] = v === "true" ? true : v === "false" ? false : v;
+      if (t.dataset.k === "view") S.faqOpen = false;
       sync();
     } else if (t && t.dataset.toggle) {
       S[t.dataset.toggle] = !S[t.dataset.toggle];
@@ -559,6 +621,11 @@ body.alarm #chrome { --fg: #f2f5f7; --bg: #0b0d10; --line: #2a313a; --accent: #3
     if (panelOpen() && !panel.contains(e.target) && !e.target.closest("#gear")) setPanel(false);
     else if (S.alarm && e.target.closest("#stage")) { stopAlarm(); sync(); }
   });
+  const toggleFaq = () => { if (!S.faq) return; S.faqOpen = !S.faqOpen; sync(); };
+  $("#faqbtn").onclick = toggleFaq;
+  $("#faqopen").onclick = () => { S.faqOpen = true; setPanel(false); sync(); };
+  $("#faqclose").onclick = () => { S.faqOpen = false; sync(); };
+  $("#notes").addEventListener("input", (e) => { S.notes = e.target.value; store.set("notes", S.notes); $("#faqtext").textContent = S.notes.trim(); });
   $("#minus").onclick = () => adjust(-60000);
   $("#plus").onclick = () => adjust(60000);
   $("#go").onclick = toggleRun;
@@ -589,6 +656,7 @@ body.alarm #chrome { --fg: #f2f5f7; --bg: #0b0d10; --line: #2a313a; --accent: #3
   document.addEventListener("keydown", (e) => {
     if (e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key === "Escape" && panelOpen()) { setPanel(false); return; }
+    if (e.key === "Escape" && S.faqOpen) { S.faqOpen = false; sync(); return; }
     if (/^(INPUT|SELECT|TEXTAREA)$/.test(e.target.tagName)) return;
     if (S.alarm && e.key !== "f" && e.key !== "F") { stopAlarm(); sync(); e.preventDefault(); return; }
     const k = e.key;
@@ -604,6 +672,7 @@ body.alarm #chrome { --fg: #f2f5f7; --bg: #0b0d10; --line: #2a313a; --accent: #3
     else if (k === "ArrowUp") { e.preventDefault(); adjust(300000); }
     else if (k === "ArrowDown") { e.preventDefault(); adjust(-300000); }
     else if (k === "h" || k === "H") { S.h12 = !S.h12; sync(); }
+    else if (k === "n" || k === "N") toggleFaq();
     else if (k === "m" || k === "M") { S.sound = !S.sound; sync(); }
   });
   $("#stage").addEventListener("dblclick", toggleFs);
