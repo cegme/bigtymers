@@ -168,6 +168,7 @@ https://ceg.me/bigtymers/?t=45m&go&face=analog&tz=Europe/London&h12=1&seconds=0&
 | h12, seconds, details, numerals | 1 or 0 |
 | now | 1 or 0, show the current time under the timer |
 | faq | 1 or 0, enable the instructor FAQ |
+| faqpin | 1 or 0, show the FAQ beside the timer |
 | tone | beep, chime, bell, siren, buzzer, digital |
 | theme | dark or light |
 

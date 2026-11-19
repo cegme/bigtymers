@@ -91,6 +91,20 @@ body[data-faq="off"] #faqbtn, body[data-faq="off"] #faqsec { display: none; }
 #faq h2 { margin: 0 0 3vmin; font-size: clamp(22px, 5vmin, 60px); letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
 #faqtext { white-space: pre-wrap; overflow-wrap: anywhere; font-size: clamp(18px, 4vmin, 48px); line-height: 1.4; max-width: 60ch; }
 #faqtext:empty::before { content: "No notes yet. Add them in Settings."; color: var(--dim); }
+/* FAQ docked beside the timer */
+#faqside { display: none; }
+body[data-faq="on"][data-faqpin="on"] #faqside {
+  display: block; position: fixed; z-index: 2; overflow-y: auto; background: var(--bg); border-left: 1px solid var(--line);
+  top: 0; right: 0; bottom: 0; width: 34vw; padding: 4vmin 3vmin max(4vmin, 88px);
+}
+body[data-faq="on"][data-faqpin="on"] #stage { right: 34vw; }
+#faqside h2 { margin: 0 0 2vmin; font-size: clamp(14px, 2.4vmin, 28px); letter-spacing: .1em; text-transform: uppercase; color: var(--dim); }
+#faqside .faqbody { white-space: pre-wrap; overflow-wrap: anywhere; font-size: clamp(14px, 2.8vmin, 32px); line-height: 1.4; }
+#faqside .faqbody:empty::before { content: "No notes yet. Add them in Settings."; color: var(--dim); }
+@media (max-aspect-ratio: 1/1) {
+  body[data-faq="on"][data-faqpin="on"] #faqside { top: auto; left: 0; width: auto; height: 38vh; border-left: 0; border-top: 1px solid var(--line); }
+  body[data-faq="on"][data-faqpin="on"] #stage { right: 0; bottom: 38vh; padding-bottom: 4vmin; }
+}
 #faqclose { position: fixed; top: 12px; left: 12px; z-index: 4; }
 #chrome { z-index: 4; position: relative; }
 #panel textarea {
@@ -137,6 +151,11 @@ body.alarm #chrome { --fg: #f2f5f7; --bg: #0b0d10; --line: #2a313a; --accent: #3
 #panel.open { transform: none; box-shadow: -12px 0 40px rgba(0, 0, 0, .35); }
 #panel header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
 #panel h2 { margin: 0; font-size: 1.15rem; }
+#panel details.colors { margin: 18px 0 8px; }
+#panel details.colors summary { cursor: pointer; font-size: .72rem; letter-spacing: .15em; text-transform: uppercase; color: var(--dim); }
+#panel details.colors summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+#panel details.colors .row { margin-top: 8px; }
+#panel input[type="color"] { width: 44px; height: 30px; padding: 2px; cursor: pointer; }
 #panel h3 { margin: 18px 0 8px; font-size: .72rem; letter-spacing: .15em; text-transform: uppercase; color: var(--dim); }
 .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }
 .row.between { justify-content: space-between; flex-wrap: nowrap; }
@@ -171,6 +190,7 @@ body.alarm #chrome { --fg: #f2f5f7; --bg: #0b0d10; --line: #2a313a; --accent: #3
     <p>BigTymers shows an analog clock face with large digits for exams, lectures, and presentations. Choose Clock to show the current time or Timer to count down from a length you set, such as 45 minutes. The page shows the end time and a warning as time runs low. It works in any modern browser, and a terminal version runs with Python 3.9 or newer. Source code is at github.com/cegme/bigtymers. Built by Christan Grant.</p>
   </div>
 </main>
+<aside id="faqside" aria-label="Test FAQ"><h2>FAQ</h2><div class="faqbody" id="faqside-text"></div></aside>
 <section id="faq" role="dialog" aria-label="Test FAQ" aria-hidden="true">
   <h2>FAQ</h2>
   <div id="faqtext"></div>
@@ -249,10 +269,18 @@ body.alarm #chrome { --fg: #f2f5f7; --bg: #0b0d10; --line: #2a313a; --accent: #3
   <h3>FAQ</h3>
   <div class="row between"><span>Instructor FAQ</span><button class="switch" data-toggle="faq" role="switch" type="button" aria-label="Enable instructor FAQ"></button></div>
   <div id="faqsec">
+    <div class="row between"><span>Show FAQ beside the timer</span><button class="switch" data-toggle="faqpin" role="switch" type="button" aria-label="Show FAQ beside the timer"></button></div>
     <p>Write notes about the test for students. Use the FAQ button, or <kbd>N</kbd>, to show them full screen. Notes stay in this browser.</p>
     <div class="row"><textarea id="notes" aria-label="FAQ notes" placeholder="Calculators allowed.&#10;Bathroom breaks: raise your hand.&#10;Answers go on the back page."></textarea></div>
     <div class="row"><button id="faqopen" type="button">Show FAQ</button></div>
   </div>
+
+  <details class="colors" id="colors">
+    <summary>Colors</summary>
+    <p>Colors are saved in this browser, separately for the dark and light themes.</p>
+    <div id="colorrows"></div>
+    <div class="row"><button id="colorreset" type="button">Reset to default colors</button></div>
+  </details>
 
   <h3>Terminal</h3>
   <p>Run it without downloading anything:</p>
@@ -261,7 +289,13 @@ body.alarm #chrome { --fg: #f2f5f7; --bg: #0b0d10; --line: #2a313a; --accent: #3
 
   <h3>Shortcuts</h3>
   <p><kbd>Space</kbd> start or pause, or dismiss the alarm. <kbd>V</kbd> clock or timer. <kbd>A</kbd> cycle faces. <kbd>F</kbd> full screen. <kbd>S</kbd> settings. <kbd>+</kbd> <kbd>&minus;</kbd> 1 minute, <kbd>&uarr;</kbd> <kbd>&darr;</kbd> 5 minutes. <kbd>R</kbd> reset. <kbd>H</kbd> 12 or 24 hour. <kbd>M</kbd> mute. <kbd>N</kbd> FAQ when enabled. Double click for full screen.</p>
-  <p>Link options: <kbd>?t=45m&amp;go&amp;face=analog&amp;tz=Europe/London&amp;h12=1&amp;seconds=0&amp;details=1&amp;now=1&amp;faq=1</kbd></p>
+  <p>Link options: <kbd>?t=45m&amp;go&amp;face=analog&amp;tz=Europe/London&amp;h12=1&amp;seconds=0&amp;details=1&amp;now=1&amp;faq=1&amp;faqpin=1</kbd></p>
+
+  <hr style="border:0;border-top:1px solid var(--line);margin:20px 0 12px">
+  <footer style="color:var(--dim);font-size:.8rem;line-height:1.5">
+    <div>&copy; 2026 Christan Grant. MIT License.</div>
+    <div><a href="https://github.com/cegme/bigtymers" target="_blank" rel="noopener" style="color:var(--accent)">github.com/cegme/bigtymers</a></div>
+  </footer>
 </aside>
 
 <script>
@@ -318,6 +352,7 @@ body.alarm #chrome { --fg: #f2f5f7; --bg: #0b0d10; --line: #2a313a; --accent: #3
     nowtime: store.get("nowtime", false),
     faq: store.get("faq", false),
     notes: store.get("notes", ""),
+    faqpin: store.get("faqpin", false),
     faqOpen: false,
     tz: store.get("tz", ""),
     duration: store.get("duration", 10 * 60 * 1000),
@@ -331,12 +366,50 @@ body.alarm #chrome { --fg: #f2f5f7; --bg: #0b0d10; --line: #2a313a; --accent: #3
   for (const k of ["h12", "seconds", "details", "numerals"]) if (flag(k) !== null) S[k] = flag(k);
   if (flag("now") !== null) S.nowtime = flag("now");
   if (flag("faq") !== null) S.faq = flag("faq");
+  if (flag("faqpin") !== null) S.faqpin = flag("faqpin");
   if (q.has("tone")) S.tone = q.get("tone");
   if (q.get("theme") === "light") S.dark = false;
   if (q.get("theme") === "dark") S.dark = true;
   if (!FACES.includes(S.face)) S.face = "both";
   S.left = S.duration;
-  const PERSIST = ["face", "h12", "seconds", "details", "numerals", "sound", "tone", "volume", "repeat", "warn", "dark", "tz", "nowtime", "faq", "notes"];
+  const PERSIST = ["face", "h12", "seconds", "details", "numerals", "sound", "tone", "volume", "repeat", "warn", "dark", "tz", "nowtime", "faq", "faqpin", "notes"];
+
+  // ---- color palette ----
+  const COLOR_DEFAULTS = {
+    dark: { "--bg": "#0b0d10", "--fg": "#f2f5f7", "--dim": "#7d8894", "--accent": "#35d07f", "--warn": "#f5b84a", "--danger": "#ff5252" },
+    light: { "--bg": "#fafafa", "--fg": "#14181c", "--dim": "#6a7580", "--accent": "#0f8a55", "--warn": "#a96a00", "--danger": "#cf2222" },
+  };
+  const COLOR_LABELS = { "--bg": "Background", "--fg": "Text", "--dim": "Muted text", "--accent": "Timer running", "--warn": "Timer warning", "--danger": "Timer low and seconds hand" };
+  const HEX = /^#[0-9a-f]{6}$/i;
+  let colors = { dark: {}, light: {} };
+  try {
+    const saved = store.get("colors", {});
+    for (const th of ["dark", "light"]) for (const [k, v] of Object.entries((saved && saved[th]) || {})) if (k in COLOR_LABELS && HEX.test(v)) colors[th][k] = v;
+  } catch (e) { /* ignore bad saved colors */ }
+
+  function applyColors() {
+    const th = S.dark ? "dark" : "light", root = document.documentElement.style;
+    for (const k of Object.keys(COLOR_LABELS)) {
+      if (colors[th][k]) root.setProperty(k, colors[th][k]); else root.removeProperty(k);
+    }
+    $$("#colorrows input").forEach((i) => { i.value = colors[th][i.dataset.var] || COLOR_DEFAULTS[th][i.dataset.var]; });
+  }
+  function buildColorRows() {
+    const box = $("#colorrows");
+    for (const [k, label] of Object.entries(COLOR_LABELS)) {
+      const row = document.createElement("div");
+      row.className = "row between";
+      const span = document.createElement("span"); span.textContent = label;
+      const input = document.createElement("input");
+      input.type = "color"; input.dataset.var = k; input.setAttribute("aria-label", label + " color");
+      input.addEventListener("input", () => {
+        colors[S.dark ? "dark" : "light"][k] = input.value;
+        store.set("colors", colors); applyColors();
+      });
+      row.append(span, input); box.append(row);
+    }
+    $("#colorreset").onclick = () => { colors = { dark: {}, light: {} }; store.set("colors", colors); applyColors(); };
+  }
 
   const remaining = () => (S.running ? Math.max(0, S.endAt - Date.now()) : S.left);
 
@@ -567,12 +640,15 @@ body.alarm #chrome { --fg: #f2f5f7; --bg: #0b0d10; --line: #2a313a; --accent: #3
   function sync() {
     const b = document.body;
     document.documentElement.dataset.theme = S.dark ? "dark" : "light";
+    applyColors();
     b.dataset.view = S.view;
     b.dataset.face = S.face;
     b.dataset.numerals = S.numerals ? "on" : "off";
     b.dataset.seconds = S.seconds ? "on" : "off";
     b.dataset.faq = S.faq ? "on" : "off";
+    b.dataset.faqpin = S.faqpin && S.view === "timer" && !S.faqOpen ? "on" : "off";
     if (!S.faq) S.faqOpen = false;
+    $("#faqside-text").textContent = S.notes.trim();
     $("#faq").classList.toggle("open", S.faqOpen);
     $("#faq").setAttribute("aria-hidden", String(!S.faqOpen));
     $("#faqclose").hidden = !S.faqOpen;
@@ -635,7 +711,9 @@ body.alarm #chrome { --fg: #f2f5f7; --bg: #0b0d10; --line: #2a313a; --accent: #3
   $("#faqbtn").onclick = toggleFaq;
   $("#faqopen").onclick = () => { S.faqOpen = true; setPanel(false); sync(); };
   $("#faqclose").onclick = () => { S.faqOpen = false; sync(); };
-  $("#notes").addEventListener("input", (e) => { S.notes = e.target.value; store.set("notes", S.notes); $("#faqtext").textContent = S.notes.trim(); });
+  $("#notes").addEventListener("input", (e) => { S.notes = e.target.value; store.set("notes", S.notes); $("#faqtext").textContent = S.notes.trim(); $("#faqside-text").textContent = S.notes.trim(); });
+  buildColorRows();
+  applyColors();
   $("#minus").onclick = () => adjust(-60000);
   $("#plus").onclick = () => adjust(60000);
   $("#go").onclick = toggleRun;
